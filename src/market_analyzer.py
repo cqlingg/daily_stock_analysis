@@ -1530,7 +1530,7 @@ Concept lagging: {bottom_concepts_text if bottom_concepts_text else "N/A"}"""
 - No code blocks
 - Use emoji sparingly in headings (at most one per heading)
 - The entire fixed shell, headings, guidance, and conclusion must be in {shell_language_label}
-- News timing discipline: strictly distinguish pre-event news (previews/expectations/futures hints) from post-event news (reported/actual results/after-hours reactions). Base conclusions only on post-event facts; if an event has only pre-event coverage, explicitly state that the result is not yet published. When both exist for the same event, always use the post-event version. Convert relative time words (tonight/tomorrow/upcoming) to actual timestamps relative to the report date — never present already-happened events as future. Highlight major after-hours earnings moves with timestamps.
+- News timing discipline: strictly distinguish pre-event news (previews/expectations/futures hints) from post-event news (reported/actual results/after-hours reactions). Base conclusions only on post-event facts; if an event has only pre-event coverage, explicitly state that the result is not yet published. When both exist for the same event, always use the post-event version. Convert relative time words (tonight/tomorrow/upcoming) to actual timestamps relative to the report date — never present already-happened events as future. Highlight major after-hours earnings moves with timestamps. Data-text consistency: every index/sector description in the commentary MUST match the numbers in the injected data table (e.g., never call the least-declining index "deepening losses"); words like "widening/narrowing" may only compare vs. the prior session and must state that baseline. Macro-data timeliness: for scheduled macro releases (CPI, nonfarm payrolls, FOMC), if the report date is already past the usual release day and source material is missing, write "likely released but not covered by sources — pending confirmation" instead of asserting it cannot be confirmed.
 {data_boundary_requirement}
 
 ---
@@ -1590,7 +1590,9 @@ Output the report content directly, no extra commentary.
   2. 结论只能建立在事件后新闻上；若某事件只有事件前新闻，必须明确写明“结果尚未公布”，禁止把预期写成既成事实；
   3. 同一事件同时存在事件前和事件后新闻时，一律以事件后的为准；
   4. 新闻中的“今晚/明日/即将”等相对时间词必须结合报告日期换算为实际时点，已发生的事件不得写成未来事件；
-  5. 新闻中若出现个股财报盘后暴涨/暴跌等重大异动，必须在消息催化中体现并标注发生时间。
+  5. 新闻中若出现个股财报盘后暴涨/暴跌等重大异动，必须在消息催化中体现并标注发生时间；
+  6. 数据一致性：指数/板块的每一句描述必须与系统注入的数据表一致（例如跌幅最小的指数禁止写成“跌幅扩大”）；“扩大/收窄”等词只允许用于与前一交易日对比，并注明对比基准；
+  7. 宏观数据时效：对 CPI、非农、FOMC 等有固定发布日程的宏观数据，若报告日期已过其常规发布日而素材缺失，应写“可能已公布但素材未覆盖，待确认”，禁止断言“无法确认是否公布”。
 {data_boundary_requirement}
 
 ---
