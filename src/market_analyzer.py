@@ -1530,6 +1530,7 @@ Concept lagging: {bottom_concepts_text if bottom_concepts_text else "N/A"}"""
 - No code blocks
 - Use emoji sparingly in headings (at most one per heading)
 - The entire fixed shell, headings, guidance, and conclusion must be in {shell_language_label}
+- News timing discipline: strictly distinguish pre-event news (previews/expectations/futures hints) from post-event news (reported/actual results/after-hours reactions). Base conclusions only on post-event facts; if an event has only pre-event coverage, explicitly state that the result is not yet published. When both exist for the same event, always use the post-event version. Convert relative time words (tonight/tomorrow/upcoming) to actual timestamps relative to the report date — never present already-happened events as future. Highlight major after-hours earnings moves with timestamps.
 {data_boundary_requirement}
 
 ---
@@ -1584,6 +1585,12 @@ Output the report content directly, no extra commentary.
 - emoji 仅在标题处少量使用（每个标题最多1个）
 - {workflow_hint}
 - 不要重复列出已由系统注入的表格数据；正文负责解释表格背后的含义
+- 新闻时效纪律（必须遵守）：
+  1. 严格区分事件前新闻（预告/预期/暗示/盘前期货暗示）与事件后新闻（已公布/已落地/实际结果/盘后反应）；
+  2. 结论只能建立在事件后新闻上；若某事件只有事件前新闻，必须明确写明“结果尚未公布”，禁止把预期写成既成事实；
+  3. 同一事件同时存在事件前和事件后新闻时，一律以事件后的为准；
+  4. 新闻中的“今晚/明日/即将”等相对时间词必须结合报告日期换算为实际时点，已发生的事件不得写成未来事件；
+  5. 新闻中若出现个股财报盘后暴涨/暴跌等重大异动，必须在消息催化中体现并标注发生时间。
 {data_boundary_requirement}
 
 ---
