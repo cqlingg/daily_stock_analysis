@@ -464,6 +464,7 @@ def _compute_trading_day_filter(
         get_market_for_stock,
         get_open_markets_today,
         compute_effective_region,
+        filter_to_closed_markets,
     )
 
     open_markets = get_open_markets_today()
@@ -477,6 +478,10 @@ def _compute_trading_day_filter(
         effective_region = compute_effective_region(
             getattr(config, 'market_review_region', 'cn') or 'cn', open_markets
         )
+        # 只保留已收盘市场：防止 schedule 延迟触发（GitHub Actions cron
+        # 可能延迟数小时）时用盘中数据生成"收盘复盘"
+        if effective_region:
+            effective_region = filter_to_closed_markets(effective_region)
     else:
         effective_region = None
 
@@ -1497,13 +1502,20 @@ def main() -> int:
             # explicit --market-review invocation when the flag is disabled.
             effective_region = None
             if not getattr(args, 'force_run', False) and getattr(config, 'trading_day_check_enabled', True):
-                from src.core.trading_calendar import get_open_markets_today, compute_effective_region as _compute_region
+                from src.core.trading_calendar import (
+                    get_open_markets_today,
+                    compute_effective_region as _compute_region,
+                    filter_to_closed_markets,
+                )
                 open_markets = get_open_markets_today()
                 effective_region = _compute_region(
                     getattr(config, 'market_review_region', 'cn') or 'cn', open_markets
                 )
+                # 只保留已收盘市场：防止 schedule 延迟触发时用盘中数据生成"收盘复盘"
+                if effective_region:
+                    effective_region = filter_to_closed_markets(effective_region)
                 if effective_region == '':
-                    logger.info("今日大盘复盘相关市场均为非交易日，跳过执行。可使用 --force-run 强制执行。")
+                    logger.info("今日大盘复盘相关市场均为非交易日或尚未收盘，跳过执行。可使用 --force-run 强制执行。")
                     return 0
 
             logger.info("模式: 仅大盘复盘")

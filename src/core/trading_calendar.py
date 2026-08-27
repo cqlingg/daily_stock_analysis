@@ -595,3 +595,36 @@ def compute_effective_region(
     if len(open_selected) == 1:
         return open_selected[0]
     return ",".join(open_selected)
+
+
+def filter_to_closed_markets(
+    region: Optional[str], current_time: Optional[datetime] = None
+) -> Optional[str]:
+    """
+    Keep only markets whose regular session has already closed.
+
+    Guards against delayed schedule triggers (e.g. GitHub Actions cron
+    latency of several hours) generating a "post-close" market review from
+    intraday data. A market whose inferred phase is not yet POSTMARKET is
+    dropped from the review region.
+
+    Fail-open: UNKNOWN phase (exchange-calendars unavailable or calendar
+    errors) keeps the market, so a missing calendar never silently disables
+    reviews. NON_TRADING is kept for the same defensive reason (such markets
+    are normally already filtered by ``compute_effective_region``).
+    """
+    if not region:
+        return region
+    closed: List[str] = []
+    for mkt in region.split(","):
+        mkt = mkt.strip()
+        if not mkt:
+            continue
+        phase = infer_market_phase(mkt, current_time=current_time)
+        if phase in (
+            MarketPhase.POSTMARKET,
+            MarketPhase.UNKNOWN,
+            MarketPhase.NON_TRADING,
+        ):
+            closed.append(mkt)
+    return ",".join(closed)

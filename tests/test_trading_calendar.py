@@ -899,5 +899,87 @@ class ComputeEffectiveRegionTestCase(unittest.TestCase):
         self.assertEqual(result, "cn")
 
 
+class FilterToClosedMarketsTestCase(unittest.TestCase):
+    """Tests for filter_to_closed_markets (delayed-schedule guard)."""
+
+    def _filter(self, region, phases):
+        with patch.object(
+            trading_calendar,
+            "infer_market_phase",
+            side_effect=lambda mkt, current_time=None: phases.get(mkt),
+        ):
+            return trading_calendar.filter_to_closed_markets(region)
+
+    def test_empty_region_returns_empty(self):
+        self.assertEqual(trading_calendar.filter_to_closed_markets(""), "")
+        self.assertEqual(trading_calendar.filter_to_closed_markets(None), None)
+
+    def test_postmarket_kept(self):
+        self.assertEqual(
+            self._filter("cn", {"cn": trading_calendar.MarketPhase.POSTMARKET}),
+            "cn",
+        )
+
+    def test_intraday_dropped(self):
+        # Core bug scenario: delayed cron fires while CN is still trading.
+        self.assertEqual(
+            self._filter("cn", {"cn": trading_calendar.MarketPhase.INTRADAY}),
+            "",
+        )
+
+    def test_closing_auction_dropped(self):
+        self.assertEqual(
+            self._filter("cn", {"cn": trading_calendar.MarketPhase.CLOSING_AUCTION}),
+            "",
+        )
+
+    def test_lunch_break_dropped(self):
+        self.assertEqual(
+            self._filter("cn", {"cn": trading_calendar.MarketPhase.LUNCH_BREAK}),
+            "",
+        )
+
+    def test_premarket_dropped(self):
+        # 08:00 Beijing: CN premarket -> only US (postmarket) survives.
+        self.assertEqual(
+            self._filter("cn", {"cn": trading_calendar.MarketPhase.PREMARKET}),
+            "",
+        )
+
+    def test_multi_region_keeps_only_closed(self):
+        # Delayed 08:00 cron at 13:23 Beijing: CN intraday, US postmarket.
+        result = self._filter(
+            "cn,us",
+            {
+                "cn": trading_calendar.MarketPhase.INTRADAY,
+                "us": trading_calendar.MarketPhase.POSTMARKET,
+            },
+        )
+        self.assertEqual(result, "us")
+
+    def test_multi_region_normal_evening(self):
+        # Normal 18:10 Beijing run: CN postmarket, US premarket (06:10 ET).
+        result = self._filter(
+            "cn,us",
+            {
+                "cn": trading_calendar.MarketPhase.POSTMARKET,
+                "us": trading_calendar.MarketPhase.PREMARKET,
+            },
+        )
+        self.assertEqual(result, "cn")
+
+    def test_unknown_phase_fail_open_kept(self):
+        self.assertEqual(
+            self._filter("cn", {"cn": trading_calendar.MarketPhase.UNKNOWN}),
+            "cn",
+        )
+
+    def test_non_trading_kept_defensively(self):
+        self.assertEqual(
+            self._filter("cn", {"cn": trading_calendar.MarketPhase.NON_TRADING}),
+            "cn",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
