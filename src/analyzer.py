@@ -3286,16 +3286,62 @@ class GeminiAnalyzer:
                 )
 
                 content = self._extract_completion_text(response)
-                if content:
-                    usage_messages = None if audit_context is not None else call_kwargs["messages"]
-                    usage = self._normalize_usage(
-                        extract_usage_payload(response),
-                        model=usage_model or model,
-                        provider=usage_provider,
-                        messages=usage_messages,
+                _retry_stream_usage: Optional[Dict[str, Any]] = None
+                if not content:
+                    # Reasoning models (e.g. DeepSeek V4-Pro) occasionally spend
+                    # the entire budget on thinking and return an empty
+                    # non-stream message. Retry the same model once in streaming
+                    # mode, which still surfaces whatever content was produced.
+                    logger.warning(
+                        "[LiteLLM] %s non-stream returned empty content, retrying once with stream=True",
+                        model,
                     )
-                    if audit_context is not None:
-                        usage = _attach_usage_audit(usage, call_kwargs["messages"])
+                    try:
+                        _retry_stream_text, _retry_stream_usage = self._consume_litellm_stream(
+                            call_litellm_with_param_recovery(
+                                lambda kwargs: self._dispatch_litellm_completion(
+                                    model,
+                                    kwargs,
+                                    config=config,
+                                    use_channel_router=use_channel_router,
+                                    router_model_names=router_model_names,
+                                ),
+                                model=model,
+                                call_kwargs={**call_kwargs, "stream": True},
+                                model_list=recovery_model_list,
+                                cache_recovery=False,
+                                logger=logger,
+                            ),
+                            model=model,
+                            usage_model=usage_model,
+                            provider=usage_provider,
+                        )
+                        content = _retry_stream_text
+                    except Exception as retry_exc:
+                        safe_error = self._sanitize_litellm_exception_text(
+                            retry_exc, config=config, model=model
+                        )
+                        logger.warning(
+                            "[LiteLLM] %s stream retry after empty non-stream also failed: %s",
+                            model,
+                            safe_error,
+                        )
+                        raise ValueError("LLM returned empty response") from retry_exc
+                if content:
+                    if _retry_stream_usage is not None:
+                        usage = _attach_usage_audit(
+                            _retry_stream_usage, call_kwargs["messages"]
+                        )
+                    else:
+                        usage_messages = None if audit_context is not None else call_kwargs["messages"]
+                        usage = self._normalize_usage(
+                            extract_usage_payload(response),
+                            model=usage_model or model,
+                            provider=usage_provider,
+                            messages=usage_messages,
+                        )
+                        if audit_context is not None:
+                            usage = _attach_usage_audit(usage, call_kwargs["messages"])
                     last_response_text = content
                     last_model = model
                     last_usage = usage
