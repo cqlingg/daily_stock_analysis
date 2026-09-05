@@ -682,32 +682,44 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
                 "[大盘] %s action=generate_review status=fallback_template reason=no_analyzer",
                 self._log_context(),
             )
-            return self._generate_template_review(overview, news)
+            return self._prepend_degradation_notice(
+                self._generate_template_review(overview, news)
+            )
 
         # 构建 Prompt
         prompt = self._build_review_prompt(overview, news)
 
         logger.info("[大盘] %s action=generate_review status=start", self._log_context())
         # Use the public generate_text() entry point - never access private analyzer attributes.
+        # 2026-09-05修复：瞬时失败（限流/超时/空响应）导致骨架报告被当正常复盘推送，
+        # 现增加一次重试；仍失败才降级模板（模板会带显著降级标记）
         llm_started_at = time.perf_counter()
-        try:
-            record_llm_run_started(
-                provider="litellm",
-                model=getattr(self.config, "litellm_model", None),
-                call_type="market_review",
-            )
-            review = self.analyzer.generate_text(prompt, max_tokens=8192, temperature=0.7)
-        except Exception as exc:
-            record_llm_run(
-                success=False,
-                provider="litellm",
-                model=getattr(self.config, "litellm_model", None),
-                call_type="market_review",
-                duration_ms=int((time.perf_counter() - llm_started_at) * 1000),
-                error_type=type(exc).__name__,
-                error_message=exc,
-            )
-            raise
+        review = None
+        last_exc: Optional[Exception] = None
+        for attempt in (1, 2):
+            try:
+                record_llm_run_started(
+                    provider="litellm",
+                    model=getattr(self.config, "litellm_model", None),
+                    call_type="market_review",
+                )
+                review = self.analyzer.generate_text(prompt, max_tokens=8192, temperature=0.7)
+                if review:
+                    break
+                logger.warning(
+                    "[大盘] %s action=generate_review status=empty attempt=%d/2",
+                    self._log_context(), attempt,
+                )
+            except Exception as exc:
+                last_exc = exc
+                logger.warning(
+                    "[大盘] %s action=generate_review status=error attempt=%d/2 error=%s",
+                    self._log_context(), attempt, exc,
+                )
+            if attempt < 2:
+                time.sleep(5)
+        if last_exc is not None and not review:
+            raise last_exc
 
         record_llm_run(
             success=bool(review),
@@ -732,7 +744,17 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
             "[大盘] %s action=generate_review status=fallback_template reason=empty_llm_response",
             self._log_context(),
         )
-        return self._generate_template_review(overview, news)
+        return self._prepend_degradation_notice(
+            self._generate_template_review(overview, news)
+        )
+
+    @staticmethod
+    def _prepend_degradation_notice(template: str) -> str:
+        """模板降级时显著标记（2026-09-05）：避免骨架报告被当成 AI 分析正常推送"""
+        if not template:
+            return template
+        notice = "⚠️ **降级报告**：本次 LLM 生成失败，以下为纯数据模板（非 AI 分析）。\n\n"
+        return notice + template
 
     def _get_analyzer_generation_backend_config_error(self) -> Optional[GenerationError]:
         """Return analyzer backend config errors without relying on dynamic mock attributes."""

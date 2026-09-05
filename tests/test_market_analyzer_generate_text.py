@@ -2662,7 +2662,8 @@ class TestMarketAnalyzerBypassFix:
         )
         result = ma.generate_market_review(overview, [])
         assert isinstance(result, str) and len(result) > 0
-        ma.analyzer.generate_text.assert_called_once()
+        # 2026-09-05: 空响应重试一次（共2次调用），仍空才降级模板
+        assert ma.analyzer.generate_text.call_count == 2
 
     def test_generation_backend_config_error_does_not_template_fallback(self):
         from src.llm.generation_backend import GenerationError
